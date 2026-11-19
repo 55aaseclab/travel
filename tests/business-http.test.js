@@ -100,3 +100,38 @@ test('business activation requires exact one-space private configuration and per
   await writeFile(configFile, JSON.stringify({ version: 1, webSpace: spaceId, spaces: { [spaceId]: ['test-2026'], another: ['test-2026'] } }));
   assert.throws(() => loadBusinessService(env, { seedDir: f.seedDir }), /one explicit/);
 });
+
+test('an empty managed space starts without records and later accepts an explicitly imported catalog', async t => {
+  const f = await fixture(t);
+  for (const [file, data] of [['trips.json', { trips: [] }], ['routes.json', { routes: [] }], ['photo-credits.json', []]]) {
+    await writeFile(join(f.seedDir, file), JSON.stringify(data));
+  }
+  const configFile = join(f.root, 'empty-business.json'), keyFile = join(f.root, 'empty-business.key');
+  await writeFile(configFile, JSON.stringify({ version: 1, webSpace: spaceId, spaces: { [spaceId]: [] } }), { mode: 0o600 });
+  await writeFile(keyFile, key, { mode: 0o600 });
+  const env = { TRAVEL_DATA_DIR: f.dataDir, TRAVEL_BUSINESS_KEY_FILE: keyFile, TRAVEL_BUSINESS_CONFIG_FILE: configFile };
+  const empty = loadBusinessService(env, { seedDir: f.seedDir });
+  const server = await serve(t, { businessService: empty, publicDir: f.publicDir, dataDir: f.seedDir });
+  assert.equal((await request(server, '/health')).status, 200);
+  const catalog = await request(server, '/');
+  assert.equal(catalog.status, 200);
+  assert.doesNotMatch(catalog.text, /汉字公园|中文旅行/);
+  assert.deepEqual(JSON.parse((await request(server, '/routes.json')).text), { routes: [] });
+  assert.deepEqual(await f.invoke(f.request('list_itineraries'), {}, empty), { spaceId, items: [] });
+  const integrity = await f.invoke({ operation: 'integrity', spaceId }, { resources: ['*'] }, empty);
+  assert.equal(integrity.resourceCount, 0);
+  await assert.rejects(f.invoke(f.request('read_itinerary'), {}, empty), error => error.status === 404 && error.code === 'NOT_FOUND');
+  await assert.rejects(f.invoke(f.request('list_itineraries'), { spaceId: 'another-space' }, empty), error => error.status === 403);
+  assert.equal((await request(server, '/api/business', { method: 'POST', body: '{}', headers: { 'Content-Type': 'application/json' } })).status, 401);
+  assert.deepEqual(await readdir(f.dataDir), []);
+
+  await metadata(f);
+  await writeFile(configFile, JSON.stringify({ version: 1, webSpace: spaceId, spaces: { [spaceId]: ['test-2026'] } }), { mode: 0o600 });
+  const activated = loadBusinessService(env, { seedDir: f.seedDir });
+  const list = await f.invoke(f.request('list_itineraries'), {}, activated);
+  assert.equal(list.items.length, 1);
+  assert.equal(list.items[0].resourceId, f.resourceId);
+  const imported = await f.invoke(f.request('read_itinerary'), {}, activated);
+  assert.equal(imported.itinerary.tripId, 'test-2026');
+  assert.deepEqual(await readdir(f.dataDir), []);
+});

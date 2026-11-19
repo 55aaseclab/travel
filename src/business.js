@@ -52,7 +52,7 @@ export class BusinessService {
     if (!Buffer.isBuffer(key) || key.length < 32 || key.length > 4096 || typeof dataDir !== 'string' || !isAbsolute(dataDir)) throw new Error('Travel business key and working directory are invalid');
     if (!object(spaces) || Object.keys(spaces).length !== 1 || !identifier(webSpace) || !Object.hasOwn(spaces, webSpace)) throw new Error('Travel pilot requires one explicit shared-guide web space');
     const ids = spaces[webSpace];
-    if (!Array.isArray(ids) || !ids.length || ids.length > 10 || new Set(ids).size !== ids.length || ids.some(id => typeof id !== 'string' || id.length > 80 || !tripPattern.test(id))) throw new Error('Travel business space requires unique declared trip IDs');
+    if (!Array.isArray(ids) || ids.length > 10 || new Set(ids).size !== ids.length || ids.some(id => typeof id !== 'string' || id.length > 80 || !tripPattern.test(id))) throw new Error('Travel business space requires unique declared trip IDs');
     this.key = Buffer.from(key); this.now = now; this.seedDir = resolve(seedDir); this.webSpace = webSpace;
     this.stores = new Map(ids.map(tripId => { const store = new ItineraryStore({ key, dataDir, seedDir, spaceId: webSpace, tripId, now }); return [store.resourceId, store]; }));
     this.mapClient = createAMapClient({ ...mapOptions, mapClock: mapOptions.mapClock || now });
