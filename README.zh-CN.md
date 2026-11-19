@@ -13,3 +13,7 @@ npm start -- --host 127.0.0.1 --port 4323
 ## 受管安装
 
 受管服务可从空行程列表启动，例如 `{"version":1,"webSpace":"personal","spaces":{"personal":[]}}`。原生目录和带签名的行程列表均为空，启动时不创建行程记录。首次导入时，由获授权的内容流程提供来源 JSON 及目录元数据，在同一个私有空间映射中登记行程标识，再重启 Travel。保留原 `TRAVEL_DATA_DIR`、签名密钥和空间标识，以便已有编辑继续对应原来源。
+
+## Praxis 集成
+
+应用维护的[供数合同](docs/PRAXIS-PROVIDER.md)提供按授权过滤、有来源依据的卡片与数据源描述，不增加 HTTP 元数据入口。使用 `npm run test:provider` 验证隔离供数测试。
