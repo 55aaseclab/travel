@@ -1,5 +1,7 @@
+import { join } from 'node:path';
 import { projectInventory } from './inventory.mjs';
 export function createStorageIntegration() { return {
+  recovery: { configFields: ['dataDir'], async collect(ctx) { await ctx.register({kind:'sqlite',source:ctx.path('dataDir','travel.db'),target:'travel.db'}); } },
   inventory: { project: projectInventory },
   "rootId": "travel",
   "paths": {
@@ -8,9 +10,10 @@ export function createStorageIntegration() { return {
   },
   "sources": [
     {
-      "kind": "directory",
+      "kind": "sqlite",
       "path": "travel",
-      "target": "itineraries"
+      "relative": "travel.db",
+      "target": "travel.db"
     },
     {
       "kind": "directory",

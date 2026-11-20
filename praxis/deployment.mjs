@@ -1,7 +1,10 @@
+import { initializeDatabase } from './database.mjs';
 import { createDemoIntegration } from './demo.mjs';
 import { createStackIntegration } from './stack.mjs';
 import { localCompose } from './local-compose.mjs';
 export function createDeploymentIntegration() { return {
+  initializeDatabase,
+  initialDatabases: [{"path": "travel.db", "spaceId": "local", "value": null}],
   demo: createDemoIntegration(),
   stack: createStackIntegration(),
   localCompose,

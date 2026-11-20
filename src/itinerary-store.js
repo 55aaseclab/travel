@@ -1,3 +1,4 @@
+import { isDatabase, readDocument, writeDocument, hasDocument, transaction, beforeCommit } from './sqlite-document.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile, lstat, mkdir, open, unlink, realpath } from 'node:fs/promises';
 import { renameSync } from 'node:fs';
@@ -26,11 +27,11 @@ async function safeRead(file, max) {
 }
 
 export class ItineraryStore {
-  constructor({ dataDir, seedDir = DATA_DIR, spaceId, tripId, key, now = Date.now }) {
+  constructor({ databaseFile, dataDir, seedDir = DATA_DIR, spaceId, tripId, key, now = Date.now }) {
     if (typeof dataDir !== 'string' || !isAbsolute(dataDir) || !identifier(spaceId) || typeof tripId !== 'string' || tripId.length > 80 || !tripPattern.test(tripId) || !Buffer.isBuffer(key) || key.length < 32) throw new Error('Invalid itinerary store configuration');
     this.dataDir = resolve(dataDir); this.seedDir = resolve(seedDir); this.spaceId = spaceId; this.tripId = tripId; this.now = now;
     this.resourceId = itineraryResourceId(spaceId, tripId);
-    this.file = join(this.dataDir, hash(spaceId).slice(0, 24), tripId + '.json');
+    this.file = databaseFile ? resolve(databaseFile) : join(this.dataDir, hash(spaceId).slice(0, 24), tripId + '.json');
     this.seedFile = join(this.seedDir, tripId + '.json');
   }
 
@@ -60,11 +61,12 @@ export class ItineraryStore {
   async read() {
     let raw;
     try {
+      if (isDatabase(this.file)) { if (!hasDocument(this.file, this.spaceId, this.tripId)) throw Object.assign(new Error('No initialized itinerary'), { code: 'ENOENT' }); const record=readDocument(this.file,this.spaceId,this.tripId); if(record.byteSize>MAX_FILE) fail('Data source is too large',422,'CORRUPT_DATA'); raw=Buffer.from(JSON.stringify(record.value)); } else {
       const base = await lstat(this.dataDir);
       if (!base.isDirectory() || base.isSymbolicLink() || await realpath(this.dataDir) !== this.dataDir) fail('Working data path is unsafe', 422, 'CORRUPT_DATA');
       const parent = await lstat(dirname(this.file));
       if (!parent.isDirectory() || parent.isSymbolicLink() || await realpath(dirname(this.file)) !== dirname(this.file)) fail('Working namespace is unsafe', 422, 'CORRUPT_DATA');
-      raw = await safeRead(this.file, MAX_FILE);
+      raw = await safeRead(this.file, MAX_FILE); }
     }
     catch (error) {
       if (error.code === 'ENOENT') return { itinerary: await this.seed(), revision: '0', cursor: 0, updatedAt: null, state: { resourceId: this.resourceId, revision: 0, cursor: 0, updatedAt: null, receipts: [], events: [] } };
@@ -82,6 +84,7 @@ export class ItineraryStore {
   }
 
   async lock(callback) {
+    if (isDatabase(this.file)) return transaction(this.file, callback);
     const base = await realpath(this.dataDir);
     if (base !== this.dataDir) fail('Working data paths must be canonical', 503, 'UNSAFE_DATA_PATH');
     try { await mkdir(dirname(this.file), { mode: 0o700 }); } catch (error) { if (error.code !== 'EEXIST') throw error; }
@@ -109,6 +112,7 @@ export class ItineraryStore {
   async atomicWrite(value, expiresAt) {
     const raw = Buffer.from(JSON.stringify(value, null, 2) + '\n');
     if (raw.length > MAX_FILE) fail('Itinerary history has reached its storage limit', 507, 'STATE_LIMIT');
+    if(isDatabase(this.file)){beforeCommit(this.file,()=>{if(expiresAt<=this.now())fail('Business assertion expired before commit',401,'INVALID_ASSERTION');});if(expiresAt<=this.now())fail('Business assertion expired before commit',401,'INVALID_ASSERTION');await writeDocument(this.file,this.spaceId,this.tripId,value,String(value._business.revision),raw.toString());return;}
     const temporary = this.file + '.' + randomUUID() + '.tmp';
     let handle, committed = false;
     try {

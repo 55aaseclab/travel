@@ -21,9 +21,10 @@ const metadata = {
       "labels": {
         "zh": "受管行程"
       },
-      "kind": "directory",
+      "kind": "sqlite",
       "location": {
-        "env": "TRAVEL_DATA_DIR"
+        "env": "TRAVEL_DATA_DIR",
+        "relative": "travel.db"
       }
     },
     {

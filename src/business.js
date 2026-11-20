@@ -44,17 +44,17 @@ export function loadBusinessService(env = process.env, options = {}) {
   let config;
   try { config = JSON.parse(configBytes); } catch { throw new Error('Travel business configuration must contain valid JSON'); }
   if (!object(config) || Object.keys(config).some(name => !['version', 'webSpace', 'spaces'].includes(name)) || config.version !== 1) throw new Error('Travel business configuration version is invalid');
-  return new BusinessService({ seedDir: resolveContentPaths(env).seedDir, ...options, key: readFileSync(env.TRAVEL_BUSINESS_KEY_FILE), dataDir: env.TRAVEL_DATA_DIR, spaces: config.spaces, webSpace: config.webSpace });
+  return new BusinessService({ databaseFile: env.TRAVEL_DATABASE_FILE || join(env.TRAVEL_DATA_DIR,'travel.db'), seedDir: resolveContentPaths(env).seedDir, ...options, key: readFileSync(env.TRAVEL_BUSINESS_KEY_FILE), dataDir: env.TRAVEL_DATA_DIR, spaces: config.spaces, webSpace: config.webSpace });
 }
 
 export class BusinessService {
-  constructor({ key, dataDir, spaces, webSpace, seedDir = DATA_DIR, now = Date.now, mapOptions = {}, fliggyOptions = {} }) {
+  constructor({ databaseFile, key, dataDir, spaces, webSpace, seedDir = DATA_DIR, now = Date.now, mapOptions = {}, fliggyOptions = {} }) {
     if (!Buffer.isBuffer(key) || key.length < 32 || key.length > 4096 || typeof dataDir !== 'string' || !isAbsolute(dataDir)) throw new Error('Travel business key and working directory are invalid');
     if (!object(spaces) || Object.keys(spaces).length !== 1 || !identifier(webSpace) || !Object.hasOwn(spaces, webSpace)) throw new Error('Travel pilot requires one explicit shared-guide web space');
     const ids = spaces[webSpace];
     if (!Array.isArray(ids) || ids.length > 10 || new Set(ids).size !== ids.length || ids.some(id => typeof id !== 'string' || id.length > 80 || !tripPattern.test(id))) throw new Error('Travel business space requires unique declared trip IDs');
     this.key = Buffer.from(key); this.now = now; this.seedDir = resolve(seedDir); this.webSpace = webSpace;
-    this.stores = new Map(ids.map(tripId => { const store = new ItineraryStore({ key, dataDir, seedDir, spaceId: webSpace, tripId, now }); return [store.resourceId, store]; }));
+    this.stores = new Map(ids.map(tripId => { const store = new ItineraryStore({ databaseFile, key, dataDir, seedDir, spaceId: webSpace, tripId, now }); return [store.resourceId, store]; }));
     this.mapClient = createAMapClient({ ...mapOptions, mapClock: mapOptions.mapClock || now });
     this.fliggyClient = createFliggyClient({ ...fliggyOptions, clock: fliggyOptions.clock || now });
   }
