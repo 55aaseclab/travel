@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "travel",
+  "version": "0.1.18",
+  "kind": "app",
+  "name": "Travel",
+  "description": "Trip plans, places and photos",
+  "labels": {
+    "en": {
+      "name": "Travel",
+      "description": "Trip plans, places and photos"
+    },
+    "zh": {
+      "name": "Travel",
+      "description": "旅行计划"
+    }
+  },
+  "icon": "public/praxis-icon.svg",
+  "iconAliases": [
+    "/travel-icon.svg"
+  ],
+  "path": "/",
+  "port": 4323,
+  "documents": {
+    "prd": {
+      "en": "docs/PRD.en.md",
+      "zh": "docs/PRD.md"
+    }
+  }
+}
