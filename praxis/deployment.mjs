@@ -15,6 +15,7 @@ export function createDeploymentIntegration() { return {
   "adapterPort": 4323,
   "runtime": {
     "TRAVEL_DATA_DIR": "/data/travel",
+    "TRAVEL_REQUIRE_DATABASE": "1",
     "TRAVEL_BUSINESS_KEY_FILE": "/config/key",
     "TRAVEL_BUSINESS_CONFIG_FILE": "/config/spaces.json"
   },

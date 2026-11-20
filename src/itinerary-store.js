@@ -27,9 +27,9 @@ async function safeRead(file, max) {
 }
 
 export class ItineraryStore {
-  constructor({ databaseFile, dataDir, seedDir = DATA_DIR, spaceId, tripId, key, now = Date.now }) {
+  constructor({ databaseFile, requireExisting = false, dataDir, seedDir = DATA_DIR, spaceId, tripId, key, now = Date.now }) {
     if (typeof dataDir !== 'string' || !isAbsolute(dataDir) || !identifier(spaceId) || typeof tripId !== 'string' || tripId.length > 80 || !tripPattern.test(tripId) || !Buffer.isBuffer(key) || key.length < 32) throw new Error('Invalid itinerary store configuration');
-    this.dataDir = resolve(dataDir); this.seedDir = resolve(seedDir); this.spaceId = spaceId; this.tripId = tripId; this.now = now;
+    this.requireExisting=requireExisting; this.dataDir = resolve(dataDir); this.seedDir = resolve(seedDir); this.spaceId = spaceId; this.tripId = tripId; this.now = now;
     this.resourceId = itineraryResourceId(spaceId, tripId);
     this.file = databaseFile ? resolve(databaseFile) : join(this.dataDir, hash(spaceId).slice(0, 24), tripId + '.json');
     this.seedFile = join(this.seedDir, tripId + '.json');
@@ -61,7 +61,7 @@ export class ItineraryStore {
   async read() {
     let raw;
     try {
-      if (isDatabase(this.file)) { if (!hasDocument(this.file, this.spaceId, this.tripId)) throw Object.assign(new Error('No initialized itinerary'), { code: 'ENOENT' }); const record=readDocument(this.file,this.spaceId,this.tripId); if(record.byteSize>MAX_FILE) fail('Data source is too large',422,'CORRUPT_DATA'); raw=Buffer.from(JSON.stringify(record.value)); } else {
+      if (isDatabase(this.file)) { if (this.requireExisting && !hasDocument(this.file,this.spaceId,this.tripId)) fail('Configured itinerary database record is missing',503,'DATA_UNAVAILABLE'); if (!hasDocument(this.file, this.spaceId, this.tripId)) throw Object.assign(new Error('No initialized itinerary'), { code: 'ENOENT' }); const record=readDocument(this.file,this.spaceId,this.tripId); if(record.byteSize>MAX_FILE) fail('Data source is too large',422,'CORRUPT_DATA'); raw=Buffer.from(JSON.stringify(record.value)); } else {
       const base = await lstat(this.dataDir);
       if (!base.isDirectory() || base.isSymbolicLink() || await realpath(this.dataDir) !== this.dataDir) fail('Working data path is unsafe', 422, 'CORRUPT_DATA');
       const parent = await lstat(dirname(this.file));
