@@ -1,0 +1,26 @@
+# syntax=docker/dockerfile:1
+ARG NODE_IMAGE=node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
+
+# Build this application from its own repository context.
+FROM ${NODE_IMAGE} AS base
+ARG PRAXIS_UID=1000
+ARG PRAXIS_GID=1000
+WORKDIR /app
+ENV NODE_ENV=production HOST=127.0.0.1
+RUN groupmod -o -g "${PRAXIS_GID}" node && usermod -o -u "${PRAXIS_UID}" node \
+    && mkdir -p /app /data /data/home && chown -R node:node /app /data /home/node
+USER node
+
+FROM base AS travel
+COPY --chown=node:node package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+COPY --chown=node:node src/ ./src/
+COPY --chown=node:node scripts/build-trips.js ./scripts/
+COPY --chown=node:node data/trips.json data/routes.json data/photo-credits.json ./data/
+COPY --chown=node:node public/index.html public/routes.json ./public/
+COPY --chown=node:node assets/vendor/material-icons/LICENSE ./assets/vendor/material-icons/
+RUN node scripts/build-trips.js
+COPY --chown=node:node praxis-provider.mjs ./
+ENV PORT=4323
+EXPOSE 4323
+CMD ["node", "src/server.js"]
